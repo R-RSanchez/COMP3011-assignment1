@@ -1,5 +1,7 @@
 package comp3011.assignment1.service;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -14,12 +16,15 @@ public class TranscriptionService {
 
     private final String apiKey;
     private final RestClient restClient;
+    private final GlobalStatsService globalStatsService;
 
     public TranscriptionService(
             @Value("${OPENAI_API_KEY:}") String apiKey,
-            RestClient.Builder restClientBuilder) {
+            RestClient.Builder restClientBuilder,
+            GlobalStatsService globalStatsService) {
 
         this.apiKey = apiKey;
+        this.globalStatsService = globalStatsService;
 
         this.restClient = restClientBuilder
                 .baseUrl("https://api.openai.com")
@@ -49,9 +54,23 @@ public class TranscriptionService {
             return "No transcription received";
         }
 
+        if (response.usage() != null) {
+            globalStatsService.addUsage(
+                    response.usage().inputTokens(),
+                    response.usage().outputTokens()
+            );
+        }
+
         return response.text();
     }
 
-    private record TranscriptionResponse(String text) {
+    private record TranscriptionResponse(
+            String text,
+            Usage usage) {
+    }
+
+    private record Usage(
+            @JsonProperty("input_tokens") long inputTokens,
+            @JsonProperty("output_tokens") long outputTokens) {
     }
 }
